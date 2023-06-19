@@ -15,7 +15,7 @@ export async function start() {
 
     // Log in to Discord with your client's token
     const token = await getBotToken();
-    client.login(token);
+    await client.login(token);
 
     // When the client is ready, run this code (only once)
     // We use 'c' for the event parameter to keep it separate from the already defined 'client'
