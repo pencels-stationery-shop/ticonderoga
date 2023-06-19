@@ -76,36 +76,56 @@ interface EmoteRolePair {
 }
 
 async function registerReactionRoles(client: Client, guildId: string) {
-    const reactionRoles = await store.collection(`guilds/${guildId}/reaction-roles`).get();
-    for (const snapshot of reactionRoles.docs) {
-        const rule = snapshot.data() as ReactionRoleRule;
+    const reactionRolesColl = store.collection(`guilds/${guildId}/reaction-roles`);
+
+    // React to changes in the rules and reset message reactions.
+    reactionRolesColl.onSnapshot(async snapshot => {
+        const reactionRoles = snapshot.docs.map(doc => doc.data() as ReactionRoleRule);
 
         // Add default reactions to message.
-        const message = await fetchMessage(client, guildId, rule.channelId, rule.messageId);
-        for (const { emote } of rule.roles) {
-            await message?.react(emote);
+        for (const rule of reactionRoles) {
+            const message = await fetchMessage(client, guildId, rule.channelId, rule.messageId);
+            if (!message) continue;
+
+            // Clean up reactions first.
+            await Promise.all(
+                message.reactions.cache.map(rxn => rxn.users.remove(client.user!))
+            );
+
+            // React with new emotes.
+            for (const { emote } of rule.roles) {
+                await message?.react(emote);
+            }
         }
+    });
 
-        // Adding roles.
-        client.on(Events.MessageReactionAdd, async (reaction, user) => {
-            if (reaction.message.id !== rule.messageId || user.equals(client.user!)) return;
+    // Adding roles.
+    client.on(Events.MessageReactionAdd, async (reaction, user) => {
+        if (user.bot) return; // Exclude bots.
 
-            const roleId = rule.roles.find(pair => pair.emote === reaction.emoji.name)?.roleId!;
-            await reaction.message.guild?.members.addRole({
-                role: roleId,
-                user: user.id,
-            });
+        // FIXME: Assume there's only one rule per message.
+        const record = await reactionRolesColl.where('messageId', '==', reaction.message.id).get();
+        const rule = record.docs[0].data() as ReactionRoleRule;
+
+        const roleId = rule.roles.find(pair => pair.emote === reaction.emoji.name)?.roleId!;
+        await reaction.message.guild?.members.addRole({
+            role: roleId,
+            user: user.id,
         });
+    });
 
-        // Removing roles.
-        client.on(Events.MessageReactionRemove, async (reaction, user) => {
-            if (reaction.message.id !== rule.messageId || user.equals(client.user!)) return;
+    // Removing roles.
+    client.on(Events.MessageReactionRemove, async (reaction, user) => {
+        if (user.bot) return; // Exclude bots.
 
-            const roleId = rule.roles.find(pair => pair.emote === reaction.emoji.name)?.roleId!;
-            await reaction.message.guild?.members.removeRole({
-                role: roleId,
-                user: user.id,
-            });
+        // FIXME: Assume there's only one rule per message.
+        const record = await reactionRolesColl.where('messageId', '==', reaction.message.id).get();
+        const rule = record.docs[0].data() as ReactionRoleRule;
+
+        const roleId = rule.roles.find(pair => pair.emote === reaction.emoji.name)?.roleId!;
+        await reaction.message.guild?.members.removeRole({
+            role: roleId,
+            user: user.id,
         });
-    }
+    });
 }
