@@ -32,10 +32,7 @@ spec:
         iam.gke.io/gke-metadata-server-enabled: "true"
       containers:
       - name: ticonderoga-bot
-        # Replace $LOCATION with your Artifact Registry location (e.g., us-west1).
-        # Replace $GCLOUD_PROJECT with your project ID.
-        image: us-central1-docker.pkg.dev/key-chalice-390220/ticonderoga/ticonderoga-gke:latest
-        # This app listens on port 8080 for web traffic by default.
+        image: LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:TAG
         resources:
           requests:
             memory: "1Gi"
