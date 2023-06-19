@@ -103,8 +103,10 @@ async function registerReactionRoles(client: Client, guildId: string) {
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
         if (user.bot) return; // Exclude bots.
 
-        // FIXME: Assume there's only one rule per message.
         const record = await reactionRolesColl.where('messageId', '==', reaction.message.id).get();
+        if (record.empty) return;
+
+        // FIXME: Assume there's only one rule per message.
         const rule = record.docs[0].data() as ReactionRoleRule;
 
         const roleId = rule.roles.find(pair => pair.emote === reaction.emoji.name)?.roleId!;
@@ -118,8 +120,10 @@ async function registerReactionRoles(client: Client, guildId: string) {
     client.on(Events.MessageReactionRemove, async (reaction, user) => {
         if (user.bot) return; // Exclude bots.
 
-        // FIXME: Assume there's only one rule per message.
         const record = await reactionRolesColl.where('messageId', '==', reaction.message.id).get();
+        if (record.empty) return;
+
+        // FIXME: Assume there's only one rule per message.
         const rule = record.docs[0].data() as ReactionRoleRule;
 
         const roleId = rule.roles.find(pair => pair.emote === reaction.emoji.name)?.roleId!;
