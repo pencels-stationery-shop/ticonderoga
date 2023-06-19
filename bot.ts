@@ -54,18 +54,18 @@ export async function start() {
     }
 }
 
-async function fetchMessage(client: Client, guildId: string, messageId: string): Promise<Message | null> {
+async function fetchMessage(client: Client, guildId: string, channelId: string, messageId: string): Promise<Message | null> {
     const guild = client.guilds.resolve(guildId);
-    const channels = await guild?.channels.fetch();
-
-    return await Promise.any(
-        channels!
-            .filter(chan => chan?.viewable && chan.isTextBased())
-            .map(chan => (chan as TextChannel).messages.fetch(messageId))
-    );
+    const channel = await guild?.channels.fetch(channelId);
+    if (channel?.viewable && channel.isTextBased()) {
+        return await channel.messages.fetch(messageId);
+    } else {
+        return null;
+    }
 }
 
 interface ReactionRoleRule {
+    channelId: string;
     messageId: string;
     roles: EmoteRolePair[];
 }
@@ -81,7 +81,7 @@ async function registerReactionRoles(client: Client, guildId: string) {
         const rule = snapshot.data() as ReactionRoleRule;
 
         // Add default reactions to message.
-        const message = await fetchMessage(client, guildId, rule.messageId);
+        const message = await fetchMessage(client, guildId, rule.channelId, rule.messageId);
         for (const { emote } of rule.roles) {
             await message?.react(emote);
         }
