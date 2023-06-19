@@ -18,11 +18,11 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GKE_PROJECT }}
-  GAR_LOCATION: us-central1 # TODO: update region of the Artifact Registry
-  GKE_CLUSTER: cluster-1    # TODO: update to cluster name
-  GKE_ZONE: us-central1-c   # TODO: update to cluster zone
-  DEPLOYMENT_NAME: ticonderoga-bot # TODO: update to deployment name
-  REPOSITORY: ticonderoga # TODO: update to Artifact Registry docker repository
+  GAR_LOCATION: us-central1
+  GKE_CLUSTER: ticonderoga-cluster
+  GKE_ZONE: us-central1-c
+  DEPLOYMENT_NAME: ticonderoga-bot
+  REPOSITORY: ticonderoga
   IMAGE: static-site
 
 jobs:
