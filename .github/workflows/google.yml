@@ -45,8 +45,8 @@ jobs:
       uses: 'google-github-actions/auth@v0'
       with:
         token_format: 'access_token'
-        workload_identity_provider: 'projects/962511402854/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
-        service_account: 'my-service-account@key-chalice-390220.iam.gserviceaccount.com'
+        workload_identity_provider: 'projects/962511402854/locations/global/workloadIdentityPools/ticonderoga/providers/ticonderoga-provider'
+        service_account: 'ticonderoga-svc-acct@key-chalice-390220.iam.gserviceaccount.com'
 
     # Alternative option - authentication via credentials json
     # - id: 'auth'
