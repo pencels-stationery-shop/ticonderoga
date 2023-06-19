@@ -1,5 +1,5 @@
 // Require the necessary discord.js classes
-import discord, { Client, Events, GatewayIntentBits, Message, Partials, TextChannel } from 'discord.js';
+import discord, { Client, Emoji, Events, GatewayIntentBits, Message, Partials, parseEmoji } from 'discord.js';
 import ping from './commands/ping';
 import { getBotToken } from './auth';
 import store from './db';
@@ -87,14 +87,19 @@ async function registerReactionRoles(client: Client, guildId: string) {
             const message = await fetchMessage(client, guildId, rule.channelId, rule.messageId);
             if (!message) continue;
 
+            // FIXME: Find a better way to do cleanup :)
             // Clean up reactions first.
-            await Promise.all(
-                message.reactions.cache.map(rxn => rxn.users.remove(client.user!))
-            );
+            // await Promise.all(
+            //     message.reactions.cache.map(rxn => rxn.users.remove(client.user!))
+            // );
 
             // React with new emotes.
             for (const { emote } of rule.roles) {
-                await message?.react(emote);
+                try {
+                    await message?.react(emote);
+                } catch (e) {
+                    console.error(e);
+                }
             }
         }
     });
@@ -109,11 +114,13 @@ async function registerReactionRoles(client: Client, guildId: string) {
         // FIXME: Assume there's only one rule per message.
         const rule = record.docs[0].data() as ReactionRoleRule;
 
-        const roleId = rule.roles.find(pair => pair.emote === reaction.emoji.name)?.roleId!;
-        await reaction.message.guild?.members.addRole({
-            role: roleId,
-            user: user.id,
-        });
+        const entry = rule.roles.find(pair => emotesEqual(pair.emote, reaction.emoji));
+        if (entry) {
+            await reaction.message.guild?.members.addRole({
+                role: entry.roleId,
+                user: user.id,
+            });
+        }
     });
 
     // Removing roles.
@@ -126,10 +133,23 @@ async function registerReactionRoles(client: Client, guildId: string) {
         // FIXME: Assume there's only one rule per message.
         const rule = record.docs[0].data() as ReactionRoleRule;
 
-        const roleId = rule.roles.find(pair => pair.emote === reaction.emoji.name)?.roleId!;
-        await reaction.message.guild?.members.removeRole({
-            role: roleId,
-            user: user.id,
-        });
+        const entry = rule.roles.find(pair => emotesEqual(pair.emote, reaction.emoji));
+        if (entry) {
+            await reaction.message.guild?.members.removeRole({
+                role: entry.roleId,
+                user: user.id,
+            });
+        }
     });
+}
+
+function emotesEqual(dbEmote: string, reactionEmote: Emoji): boolean {
+    const emote = parseEmoji(dbEmote);
+    if (!emote) return false;
+
+    if (emote.id) {
+        return emote.id === reactionEmote.id;
+    } else {
+        return emote.name === reactionEmote.name;
+    }
 }
