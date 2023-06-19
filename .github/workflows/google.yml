@@ -23,7 +23,7 @@ env:
   GKE_CLUSTER: ticonderoga-cluster
   DEPLOYMENT_NAME: ticonderoga-bot
   REPOSITORY: ticonderoga
-  IMAGE: static-site
+  IMAGE: ticonderoga-bot
 
 jobs:
   setup-build-publish-deploy:
