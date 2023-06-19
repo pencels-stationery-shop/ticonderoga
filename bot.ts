@@ -1,5 +1,5 @@
 // Require the necessary discord.js classes
-import discord, { Client, Events, GatewayIntentBits, Message, Partials } from 'discord.js';
+import discord, { Client, Events, GatewayIntentBits, Message, Partials, TextChannel } from 'discord.js';
 import ping from './commands/ping';
 import { getBotToken } from './auth';
 import store from './db';
@@ -58,20 +58,11 @@ async function fetchMessage(client: Client, guildId: string, messageId: string):
     const guild = client.guilds.resolve(guildId);
     const channels = await guild?.channels.fetch();
 
-    let message: Message | null = null;
-    for (const [_, c] of channels!) {
-        if (!c?.viewable) continue;
-        const chan = await c?.fetch(true);
-        if (chan?.isTextBased()) {
-            chan.messages.fetch(messageId)
-                .then(msg => {
-                    message = msg;
-                })
-                .catch(() => {});
-        }
-    }
-
-    return message;
+    return await Promise.any(
+        channels!
+            .filter(chan => chan?.viewable && chan.isTextBased())
+            .map(chan => (chan as TextChannel).messages.fetch(messageId))
+    );
 }
 
 interface ReactionRoleRule {
