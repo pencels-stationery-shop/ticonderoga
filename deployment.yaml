@@ -16,7 +16,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ticonderoga-gke
+  name: ticonderoga-bot
 spec:
   replicas: 1
   selector:
