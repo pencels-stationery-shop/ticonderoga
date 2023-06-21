@@ -1,10 +1,8 @@
 // Require the necessary discord.js classes
 import discord, { Client, Emoji, Events, GatewayIntentBits, Message, Partials, parseEmoji } from 'discord.js';
-import ping from './commands/ping';
 import { getBotToken } from './auth';
 import store from './db';
-import pp from './commands/pp';
-
+import commands from './commands';
 
 export async function start() {
     // Create a new client instance
@@ -23,13 +21,14 @@ export async function start() {
         console.log(`Ready! Logged in as ${c.user.tag}`);
     });
 
-    const commands = new discord.Collection<string, any>(); // bleh
-    commands.set(ping.data.name, ping);
-    commands.set(pp.data.name, pp);
+    const commandsCollection = new discord.Collection<string, any>(); // bleh
+    for (const command of commands) {
+        commandsCollection.set(command.data.name, command);
+    }
 
     client.on(Events.InteractionCreate, async (interaction) => {
         if (!interaction.isChatInputCommand()) return;
-        const command = commands.get(interaction.commandName);
+        const command = commandsCollection.get(interaction.commandName);
 
         try {
             await command.execute(interaction);

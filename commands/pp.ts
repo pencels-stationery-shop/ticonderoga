@@ -19,6 +19,6 @@ export default {
             preface = "😭 ... ";
         }
         const fraction = getRandomInt(0, 10);
-        await interaction.reply(`${userMention(interaction.user.id)}, your pp is: ${preface}${inches}.${fraction} inches long!`);
+        await interaction.reply(`${userMention(interaction.user.id)}, your pp is ${preface}${inches}.${fraction} inches long!`);
     }
 };

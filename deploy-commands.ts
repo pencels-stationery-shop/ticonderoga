@@ -1,11 +1,10 @@
 import { REST, Routes } from 'discord.js';
 
 import { getBotToken } from './auth';
-import ping from './commands/ping';
 import config from 'config';
-import pp from './commands/pp';
+import commands from './commands';
 
-const commands = [ping.data.toJSON(), pp.data.toJSON()];
+const commandData = commands.map(cmd => cmd.data.toJSON());
 
 export default async function () {
 	const token = await getBotToken();
@@ -14,12 +13,12 @@ export default async function () {
 	const rest = new REST().setToken(token!);
 
 	try {
-		console.log(`Started refreshing ${commands.length} application (/) commands.`);
+		console.log(`Started refreshing ${commandData.length} application (/) commands.`);
 
 		// The put method is used to fully refresh all commands in the guild with the current set
 		const data = await rest.put(
 			Routes.applicationCommands(config.get("discordApplicationId")),
-			{ body: commands },
+			{ body: commandData },
 		) as any;
 
 		console.log(`Successfully reloaded ${data.length} application (/) commands.`);
