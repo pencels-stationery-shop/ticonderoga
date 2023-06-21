@@ -1,12 +1,37 @@
-import { Client, Message, Events, Emoji, parseEmoji } from "discord.js";
+import { Client, Message, Events, Emoji, parseEmoji, GuildBasedChannel, TextBasedChannel, APIRole, GuildEmoji, ReactionEmoji, Role } from "discord.js";
 import store from "../db";
 
-async function fetchMessage(client: Client, guildId: string, channelId: string, messageId: string): Promise<Message | null> {
+export async function fetchMessage(client: Client, guildId: string, messageId: string, channelId?: string): Promise<Message | null> {
     const guild = client.guilds.resolve(guildId);
-    const channel = await guild?.channels.fetch(channelId);
-    if (channel?.viewable && channel.isTextBased()) {
-        return await channel.messages.fetch(messageId);
-    } else {
+
+    // If channel id given, just beeline straight for the message with it.
+    if (channelId) {
+        const channel = await guild?.channels.fetch(channelId);
+        if (channel?.viewable && channel.isTextBased()) {
+            return await channel.messages.fetch(messageId);
+        }
+
+        return null;
+    }
+
+    // Otherwise, search all channels in the current guild for the message id.
+    const channels = await guild?.channels.fetch();
+    if (!channels) {
+        throw new Error("Could not fetch channels to search for message");
+    }
+
+    try {
+        return await Promise.any(
+            channels
+                .filter(chan => chan?.viewable && chan.isTextBased())
+                .map(chan => {
+                    const textChan = chan as GuildBasedChannel & TextBasedChannel;
+                    return textChan.messages.fetch(messageId);
+                })
+        )
+    } catch (e) {
+        // If anything goes wrong, just count the message as not existing.
+        console.error(e);
         return null;
     }
 }
@@ -22,6 +47,30 @@ interface EmoteRolePair {
     roleId: string;
 }
 
+export async function assignReactionRole(guildId: string, message: Message, emoji: GuildEmoji | ReactionEmoji, role: Role | APIRole): Promise<void> {
+    const messageRef = store.collection(`guilds/${guildId}/reaction-roles`).doc(message.id);
+    const doc = await messageRef.get();
+    const data: ReactionRoleRule = doc.exists ? doc.data() as ReactionRoleRule : {
+        channelId: message.channelId,
+        messageId: message.id,
+        roles: [],
+    };
+
+    let rule = data.roles.find(rule => emotesEqual(rule.emote, emoji));
+    if (!rule) {
+        rule = {
+            emote: emoji.toString(),
+            roleId: role.id,
+        };
+        data.roles.push(rule);
+    } else {
+        rule.emote = emoji.toString();
+        rule.roleId = role.id;
+    }
+
+    messageRef.set(data);
+}
+
 export async function registerReactionRoles(client: Client, guildId: string) {
     const reactionRolesColl = store.collection(`guilds/${guildId}/reaction-roles`);
 
@@ -31,7 +80,7 @@ export async function registerReactionRoles(client: Client, guildId: string) {
 
         // Add default reactions to message.
         for (const rule of reactionRoles) {
-            const message = await fetchMessage(client, guildId, rule.channelId, rule.messageId);
+            const message = await fetchMessage(client, guildId, rule.messageId, rule.channelId);
             if (!message) continue;
 
             // FIXME: Find a better way to do cleanup :)
@@ -98,5 +147,13 @@ function emotesEqual(dbEmote: string, reactionEmote: Emoji): boolean {
         return emote.id === reactionEmote.id;
     } else {
         return emote.name === reactionEmote.name;
+    }
+}
+
+export function emoteCode(emoji: Emoji): string {
+    if (emoji.id) {
+        return `<${emoji.animated ? 'a' : ''}:${emoji.name}:${emoji.id}>`;
+    } else {
+        return emoji.name!;
     }
 }
