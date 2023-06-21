@@ -1,6 +1,6 @@
 import * as bot from "./bot";
-import deployCommands from './deploy-commands';
 import config from 'config';
+import { deployCommands } from "./commands";
 
 (async () => {
     const botName = config.get('botName');
