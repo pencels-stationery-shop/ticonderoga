@@ -1,27 +1,16 @@
-# This workflow will build a docker container, publish it to Google Container Registry, and deploy it to GKE when there is a push to the "trunk" branch.
-#
-# To configure this workflow:
-#
-# 1. Ensure that your repository contains the necessary configuration for your Google Kubernetes Engine cluster, including deployment.yml, kustomization.yml, service.yml, etc.
-#
-# 2. Create and configure a Workload Identity Provider for GitHub (https://github.com/google-github-actions/auth#setting-up-workload-identity-federation)
-#
-# 3. Change the values for the GAR_LOCATION, GKE_ZONE, GKE_CLUSTER, IMAGE, REPOSITORY and DEPLOYMENT_NAME environment variables (below).
-#
-# For more support on how to run the workflow, please visit https://github.com/google-github-actions/setup-gcloud/tree/master/example-workflows/gke-kustomize
-
-name: Build and Deploy to GKE
+name: Build and Deploy to Compute Engine
 
 on:
   push:
     branches: [ "trunk" ]
 
 env:
-  PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+  PROJECT_ID: ${{ secrets.PROJECT_ID }}
   GAR_LOCATION: us-central1
-  GKE_LOCATION: us-central1
-  GKE_CLUSTER: ticonderoga-cluster
-  DEPLOYMENT_NAME: ticonderoga-bot
+  GCE_LOCATION: us-central1
+  GCE_ZONE: us-central1-a
+  INSTANCE_NAME: ticonderoga-bot
+  TEMPLATE_NAME: ticonderoga
   REPOSITORY: ticonderoga
   IMAGE: ticonderoga-bot
 
@@ -48,21 +37,14 @@ jobs:
         workload_identity_provider: 'projects/962511402854/locations/global/workloadIdentityPools/ticonderoga/providers/ticonderoga-provider'
         service_account: 'ticonderoga-svc-acct@key-chalice-390220.iam.gserviceaccount.com'
 
-    # Alternative option - authentication via credentials json
-    # - id: 'auth'
-    #   uses: 'google-github-actions/auth@v0'
-    #   with:
-    #     credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+    - name: 'Set up gcloud CLI'
+      uses: 'google-github-actions/setup-gcloud@v1'
+      with:
+        version: '>= 363.0.0'
 
     - name: Docker configuration
       run: |-
         echo ${{steps.auth.outputs.access_token}} | docker login -u oauth2accesstoken --password-stdin https://$GAR_LOCATION-docker.pkg.dev
-    # Get the GKE credentials so we can deploy to the cluster
-    - name: Set up GKE credentials
-      uses: google-github-actions/get-gke-credentials@v0
-      with:
-        cluster_name: ${{ env.GKE_CLUSTER }}
-        location: ${{ env.GKE_LOCATION }}
 
     # Build the Docker image
     - name: Build
@@ -73,19 +55,21 @@ jobs:
           --build-arg GITHUB_REF="$GITHUB_REF" \
           .
     # Push the Docker image to Google Artifact Registry
-    - name: Publish
+    - name: Publish Image
       run: |-
         docker push "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA"
-    # Set up kustomize
-    - name: Set up Kustomize
+
+    # Create VM if it doesn't exist
+    - name: Create VM instance
       run: |-
-        curl -sfLo kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v3.1.0/kustomize_3.1.0_linux_amd64
-        chmod u+x ./kustomize
-    # Deploy the Docker image to the GKE cluster
-    - name: Deploy
+        gcloud compute instances describe $INSTANCE_NAME --zone=$GCE_ZONE --format=none || \
+        gcloud compute instances create $INSTANCE_NAME \
+          --source-instance-template $TEMPLATE_NAME \
+          --zone $GCE_ZONE
+
+    # Update container image
+    - name: Update container image
       run: |-
-        # replacing the image name in the k8s template
-        ./kustomize edit set image LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE:TAG=$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA
-        ./kustomize build . | kubectl apply -f -
-        kubectl rollout status deployment/$DEPLOYMENT_NAME
-        kubectl get services -o wide
+        gcloud compute instances update-container $INSTANCE_NAME \
+          --container-image "$GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$IMAGE:$GITHUB_SHA" \
+          --zone=$GCE_ZONE
